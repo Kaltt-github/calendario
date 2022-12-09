@@ -2,25 +2,10 @@
 
 import 'package:calendario/classes/enums.dart';
 import 'package:calendario/classes/events.dart';
+import 'package:calendario/classes/tag.dart';
+import 'package:calendario/classes/time.dart';
 // TODO
 /*
-// Config
-  
-  // Vars
-  late String name;
-  late String description;
-  late Tag tag;
-  late Icon icon;
-  late int color;
-  late int priority;
-  late List<String> shared;
-  late bool isLazy;
-  late bool isNotLazy;
-  late DateTime start;
-  late DateTime end;
-  late Lapse length;
-  late bool fullDay;
-  late List<Task> tasks;
   // Status
   late bool isComplete;
   late bool isUncomplete;
@@ -74,7 +59,38 @@ void testFatherConfig() {
   print(e.father.id);
 }
 
+void testFatherVars() {
+  /*
+  // Vars
+  late List<Task> tasks;
+  */
+  var x = EventFather.newEvent(FromType.owned, 'owner')
+    ..fullDay = true
+    ..name = 'Nombre'
+    ..description = 'Descripcion'
+    ..tag = (Tag.appTag()..color = 300)
+    ..icon = Icon.calendar
+    ..priority = 5
+    ..shared = ['share 1', 'sahre5']
+    ..start = DateTime(2020, 10, 6, 10);
+  print(x.start);
+  print(x.end);
+  x.end = DateTime(2020, 10, 8, 5);
+  print(x.start);
+  print(x.end);
+  x.length = Lapse(days: 2, hours: 1);
+  print(x.start);
+  print(x.end);
+  x.fullDay = true;
+  print(x.start);
+  print(x.end);
+  x.end = DateTime(2020, 9, 6, 7);
+  print(x.start);
+  print(x.end);
+}
+
 void main() {
-  testFatherConfig();
+  //testFatherConfig();
+  testFatherVars();
   print("Fin del test");
 }

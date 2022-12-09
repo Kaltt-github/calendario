@@ -127,13 +127,17 @@ class EventFather implements Event {
   @override
   set start(DateTime value) => _start = value;
   @override
-  DateTime get end => length.applyOn(start);
+  DateTime get end => fullDay
+      ? Lapse(years: length.years, months: length.months, days: length.days)
+          .applyOn(start)
+      : length.applyOn(start);
+
   @override
   set end(DateTime value) {
     if (value.isBefore(start)) {
       start = length.invert().applyOn(value);
     } else {
-      length = Lapse.between(start, value);
+      length = Lapse.between(value, start);
     }
   }
 
@@ -145,7 +149,7 @@ class EventFather implements Event {
   @override
   late bool fullDay;
   @override
-  late List<Task> tasks;
+  List<Task> tasks = [];
   // Status
   @override
   late bool isComplete = false;
@@ -327,8 +331,7 @@ class EventFather implements Event {
     return result;
   }
 
-  EventFather(this.id, this.from, this.owner, this.lastUpadte, {Tag? tag}) {
-    this.tag = tag ?? Tag.appTag();
+  EventFather(this.id, this.from, this.owner, this.lastUpadte, this._tag) {
     type = EventType.father;
   }
 

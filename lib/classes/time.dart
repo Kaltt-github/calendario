@@ -103,8 +103,7 @@ class Lapse {
       month -= 12;
     }
     var x = DateTime(year, month, date.day, date.hour, date.minute);
-    x.add(Duration(days: days, hours: hours, minutes: minutes));
-    return x;
+    return x.add(Duration(days: days, hours: hours, minutes: minutes));
   }
 
   // Compare

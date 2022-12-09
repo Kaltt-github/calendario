@@ -90,7 +90,6 @@ class Tag {
       Lapse());
 
   void applyOn(Event e) {
-    return; // WAITING FOR EVENT TEST
     e.icon = icon;
     e.color = color;
     e.priority = priority;
