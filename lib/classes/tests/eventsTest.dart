@@ -65,7 +65,7 @@ void testFatherVars() {
   late List<Task> tasks;
   */
   var x = EventFather.newEvent(FromType.owned, 'owner')
-    ..fullDay = true
+    ..isFullDay = true
     ..name = 'Nombre'
     ..description = 'Descripcion'
     ..tag = (Tag.appTag()..color = 300)
@@ -81,7 +81,7 @@ void testFatherVars() {
   x.length = Lapse(days: 2, hours: 1);
   print(x.start);
   print(x.end);
-  x.fullDay = true;
+  x.isFullDay = true;
   print(x.start);
   print(x.end);
   x.end = DateTime(2020, 9, 6, 7);

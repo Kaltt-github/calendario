@@ -1,17 +1,21 @@
 // ignore_for_file: file_names, avoid_print
 
+import 'package:calendario/classes/enums.dart';
 import 'package:calendario/classes/task.dart';
+
+import '../events.dart';
+
+void showT(Task t) => print('${t.position} ${t.description} ${t.isComplete}');
 
 void show(TaskList ts) {
   print('Size ${ts.size()}');
-  ts.toList().forEach((t) {
-    print('${t.position} ${t.description} ${t.isComplete}');
-  });
+  ts.toList().forEach((t) => showT(t));
   print('------------------------');
 }
 
 void main(List<String> args) {
-  var ts = TaskList(),
+  var e = EventFather.newEvent(FromType.owned, "abc"),
+      ts = TaskList(e),
       t1 = Task.newTask(0, "Des1", false),
       t2 = Task.newTask(0, "Des2", false),
       t3 = Task.newTask(0, "Des3", false),
@@ -28,7 +32,7 @@ void main(List<String> args) {
   show(ts);
   ts.removeId(t4.id);
   show(ts);
-  ts.updateId(t2.id, position: 2, description: "Wowo?");
+  ts.updateId(t2.id, position: 4, description: "Wowo?");
   show(ts);
   ts.updateAt(1, description: "meow");
   show(ts);
@@ -38,9 +42,15 @@ void main(List<String> args) {
   show(ts);
   ts.addNewTask("pipipipip");
   show(ts);
-
-  /*
-  Task operator [](int index)
-  void operator []=(int index, Task value)
-  */
+  var x = ts[1];
+  showT(ts[0]);
+  showT(x);
+  showT(ts[2]);
+  ts[0] = Task.newTask(0, 'ruuuuuu', false);
+  show(ts);
+  ts[1] = Task.newTask(0, 'fuuuuuu', false);
+  show(ts);
+  x.description = 'fofuuuuuuuuuuuuuuuuu';
+  showT(x);
+  showT(ts[1]);
 }

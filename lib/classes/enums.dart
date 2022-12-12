@@ -1,6 +1,6 @@
 enum FromType { app, google, owned, shared }
 
-enum EventType { father, anticipation, reminder, repeat, posposition }
+enum EventType { father, anticipation, reminder, repeat, postposition }
 
 enum DelayType { year, month, week, day, hour, minute, not }
 

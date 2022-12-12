@@ -26,9 +26,9 @@ void testDelay() {
   if (d.type != e || d.amount != f) {
     print('${d.type} != $e || ${d.amount} != $f');
   }
-  if (a.isEmpty() || b.isNotEmpty() || c.isNotEmpty() || d.isNotEmpty()) {
+  if (a.isEmpty || b.isNotEmpty || c.isNotEmpty || d.isNotEmpty) {
     print(
-        '${a.isEmpty()} || ${b.isNotEmpty()} || ${c.isNotEmpty()} || ${d.isNotEmpty()}');
+        '${a.isEmpty} || ${b.isNotEmpty} || ${c.isNotEmpty} || ${d.isNotEmpty}');
   }
   if (g.type != a.type || g.amount != a.amount) {
     print('${g.type} != ${a.type} || ${g.amount} != ${a.amount}');
@@ -181,10 +181,10 @@ void testLapse() {
   if (!b.isAtSameMomentAs(g)) {
     print('$b != $g');
   }
-  if (i.isNotEmpty() || Lapse().isNotEmpty()) {
+  if (i.isNotEmpty || Lapse().isNotEmpty) {
     print('empty error');
   }
-  if (c.isEmpty()) {
+  if (c.isEmpty) {
     print('not empty error');
   }
   if (!(j.isLessThan(k) &&

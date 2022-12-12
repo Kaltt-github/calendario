@@ -36,9 +36,9 @@ class Delay {
     }
   }
 
-  bool isEmpty() => type == DelayType.not;
+  bool get isEmpty => type == DelayType.not;
 
-  bool isNotEmpty() => !isEmpty();
+  bool get isNotEmpty => !isEmpty;
 
   Delay clone() => Delay(type: type, amount: amount);
 
@@ -107,8 +107,8 @@ class Lapse {
   }
 
   // Compare
-  bool isEmpty() => _mins() == 0;
-  bool isNotEmpty() => !isEmpty();
+  bool get isEmpty => _mins() == 0;
+  bool get isNotEmpty => !isEmpty;
   bool isMoreThan(Lapse x) => _mins() > x._mins();
 
   bool isLessThan(Lapse x) => _mins() < x._mins();
@@ -158,6 +158,10 @@ class Lapse {
       );
 
   Lapse invert() => multiply(-1);
+
+  Lapse toPositive() => isPositive() ? clone() : invert();
+
+  Lapse toNegative() => isNegative() ? clone() : invert();
   //
   Lapse clone() => Lapse(
       years: years, months: months, days: days, hours: hours, minutes: minutes);

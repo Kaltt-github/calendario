@@ -5,85 +5,440 @@ import 'enums.dart';
 import 'tag.dart';
 import 'task.dart';
 
-class Event {
-  // Config
-  late String id;
-  late DateTime lastUpadte;
-  late final FromType from;
-  late final EventType type;
-  late final String owner;
-  late final Event father;
-  // Vars
-  late String name;
-  late String description;
-  late Tag tag;
-  late Icon icon;
-  late int color;
-  late int priority;
-  late List<String> shared;
-  late bool isLazy;
-  late bool isNotLazy;
-  late DateTime start;
-  late DateTime end;
-  late Lapse length;
-  late bool fullDay;
-  late List<Task> tasks;
-  // Status
-  late bool isComplete;
-  late bool isUncomplete;
-  late bool isActive;
-  late bool isInactive;
-  late bool isExpired;
-  late bool isUnexpired;
-  // Anticipation
-  late List<EventAnticipation> anticipations;
-  external bool isLastAnticipation();
-  external void addAnticipationByDate(DateTime date);
-  external addAnticipationByLapse(Lapse date);
-  // Posposition
-  late Lapse pospositionLimit;
-  late DateTime pospositionLimitDate;
-  late Lapse pospositionPosposed;
-  late Lapse pospositionLapseLeft;
-  late EventPosposition posposition;
-  late bool isPosposed;
-  external bool isLastPosposition();
-  external bool pospose(Lapse lapse);
+class Anticipation {
+  final Event _event;
 
-  // Reminder
-  late List<EventReminder> reminders;
-  late Delay reminderDelay;
-  external bool isLastReminder();
-  // Repeat
-  late List<EventRepeat> repeats;
-  late Delay repeatDelay;
-  late Lapse repeatLimit;
-  late DateTime repeatLimitDate;
-  external bool isLastRepeat();
-  // Functions
-  external List<Event> selfAndChildren();
+  List<EventAnticipation> events = [];
+
+  void addByLapse(Lapse lapse) {
+    if (_event.status.isFather) {
+      if (events.where((it) => it.lapse.isEqual(lapse)).isNotEmpty) {
+        return;
+      }
+      for (Event it in [
+        _event,
+        ..._event.repeat.events,
+        _event.postposition.event
+      ]) {
+        it.anticipation.events.add(EventAnticipation(it, lapse));
+      }
+      _event.notifyChanges();
+    } else {
+      _event.father.anticipation.addByLapse(lapse);
+    }
+  }
+
+  void addByDate(DateTime date) =>
+      addByLapse(Lapse.between(date, _event.start));
+
+  void removeByLapse(Lapse lapse) {
+    if (_event.status.isFather) {
+      for (Event it in [
+        _event,
+        ..._event.repeat.events,
+        _event.postposition.event
+      ]) {
+        it.anticipation.events.removeWhere((it) => it.lapse.isEqual(lapse));
+      }
+      _event.notifyChanges();
+    } else {
+      _event.father.anticipation.removeByLapse(lapse);
+    }
+  }
+
+  void removeByDate(DateTime start) =>
+      removeByLapse(Lapse.between(_event.start, start));
+
+  Anticipation(this._event);
+}
+
+class Reminder {
+  final Event _event;
+
+  Delay _delay = Delay();
+  List<EventReminder> events = [];
+
+  Delay get delay => _delay;
+  set delay(Delay value) {
+    if (_event.status.isFather) {
+      if (value.type == DelayType.not) {
+        for (Event it in [
+          _event,
+          ..._event.repeat.events,
+          _event.postposition.event
+        ]) {
+          it.reminder
+            .._delay = value.clone()
+            ..events = [];
+        }
+      } else {
+        Lapse lapse = value.toLapse();
+        for (Event it in [
+          _event,
+          ..._event.repeat.events,
+          _event.postposition.event
+        ]) {
+          it.reminder._delay = value.clone();
+          List<EventReminder> subevents = it.reminder.events;
+          DateTime start = lapse.applyOn(it.start);
+          int i = 0;
+          while (start.isBefore(it.end)) {
+            Lapse nl = lapse.multiply(i + 1);
+            if (subevents.length <= i) {
+              subevents.add(EventReminder(it, nl));
+            } else {
+              subevents[i].lapse = nl;
+            }
+            i++;
+          }
+          subevents = subevents.sublist(0, i);
+        }
+      }
+      _event.notifyChanges();
+    } else {
+      _event.father.reminder.delay = value;
+    }
+  }
+
+  Reminder(this._event);
+}
+
+class Repeat {
+  final Event _event;
+
+  Delay _delay = Delay();
+  Lapse _limit = Lapse();
+  List<EventRepeat> events = [];
+
+  Delay get delay => _delay;
+  set delay(Delay value) {
+    if (_event.status.isFather) {
+      _delay = value;
+      if (value.type == DelayType.not) {
+        events = [];
+        return;
+      }
+      Lapse lapse = value.toLapse();
+      DateTime start = lapse.applyOn(_event.start), limit = limitDate;
+      int i = 0;
+      while (start.isBefore(limit) && events.length < 100) {
+        Lapse newlapse = lapse.multiply(i + 1);
+        if (events.length <= i) {
+          events.add(EventRepeat(_event, newlapse));
+        } else {
+          events[i].lapse = newlapse;
+        }
+        i++;
+      }
+      events = events.sublist(i);
+
+      _event.notifyChanges();
+    } else {
+      _event.father.repeat.delay = value;
+    }
+  }
+
+  Lapse get limit => _limit;
+  set limit(Lapse value) {
+    if (_event.status.isFather) {
+      if (_limit.isLessThan(value)) {
+        _limit = value;
+        events.removeWhere((it) => it.start.isAfter(limitDate));
+        _event.notifyChanges();
+      } else {
+        _limit = value;
+        delay = delay.clone();
+      }
+    } else {
+      _event.father.repeat.limit = value;
+    }
+  }
+
+  DateTime get limitDate =>
+      (limit.isEmpty ? Lapse(years: 10) : limit).applyOn(_event.start);
+  set repeatLimitDate(DateTime value) {
+    limit = Lapse.between(_event.start, value);
+  }
+
+  Repeat(this._event);
+}
+
+class Postpositon {
+  final Event _event;
+
+  Lapse _limit = Lapse();
+  Lapse _postposed = Lapse();
+  EventPostposition event;
+
+  Lapse get limit => _limit;
+  set limit(Lapse value) {
+    if (_event.status.isFather) {
+      value = value.isPositive() ? value : Lapse();
+      for (Event it in [
+        _event,
+        ..._event.anticipation.events,
+        ..._event.repeat.events
+      ]) {
+        it.postposition._limit = value;
+        if (it.postposition.postposed.isMoreThan(value)) {
+          it.postposition.postposed = value.clone();
+        }
+      }
+      _event.notifyChanges();
+    } else {
+      _event.father.postposition.limit = value;
+    }
+  }
+
+  DateTime get limitDate => limit.applyOn(_event.start);
+  set limitDate(DateTime value) {
+    limit = Lapse.between(_event.start, value);
+  }
+
+  Lapse get postposed => _postposed;
+  set postposed(Lapse value) {
+    _postposed = value;
+    _event.notifyChanges();
+  }
+
+  Lapse get lapseLeft => limit.take(postposed);
+  set lapseLeft(Lapse value) => postposed = limit.take(value);
+
+  bool postpose(Lapse lapse) {
+    var result = lapse.add(postposed);
+    if (result.isMoreThan(limit)) {
+      return false;
+    }
+    postposed = result;
+    return true;
+  }
+
+  Postpositon(this._event) : event = EventPostposition(_event, Lapse());
+}
+
+class StatusManager {
+  final Event event;
+
+  bool _lazy = false;
+  bool _complete = false;
+
+  bool get isFather => event.type == EventType.father;
+  bool get isNotFather => !isNotFather;
+
+  bool get isChild => !isFather;
+  bool get isNotChild => !isChild;
+
+  bool get isAnticipation => event.type == EventType.anticipation;
+  bool get isNotAnticipation => !isAnticipation;
+
+  bool get isReminder => event.type == EventType.reminder;
+  bool get isNotReminder => !isReminder;
+
+  bool get isRepeat => event.type == EventType.repeat;
+  bool get isNotRepeat => !isRepeat;
+
+  bool get isPostposition => event.type == EventType.postposition;
+  bool get isNotPostposition => !isPostposition;
+
+  bool get hasChildren => isFather || isAnticipation || isRepeat;
+  bool get hasNotChildren => !hasChildren;
+
+  bool get isPostposed =>
+      hasChildren && event.postposition.postposed.isNotEmpty;
+  bool get isNotPostposed => !isPostposed;
+
+  bool get isReminded => hasChildren && event.reminder.delay.isNotEmpty;
+  bool get isNotReminded => !isReminded;
+
+  bool get isAnticipated => hasChildren && event.anticipation.events.isNotEmpty;
+  bool get isNotAnticipated => !isAnticipated;
+
+  bool get isRepeated => hasChildren && event.repeat.delay.isNotEmpty;
+  bool get isNotRepeated => !isRepeated;
+
+  bool _isLast<E extends EventChild>(List<E> list, E event) =>
+      list.length - 1 == event.position();
+
+  bool get isLastReminder =>
+      isReminder && _isLast(event.reminder.events, event as EventReminder);
+  bool get isNotLastReminder => !isLastReminder;
+
+  bool get isLastRepeat =>
+      isRepeat && _isLast(event.repeat.events, event as EventRepeat);
+  bool get isNotLastRepeat => !isLastRepeat;
+
+  bool get isLastAnticipation =>
+      isAnticipation &&
+      _isLast(event.anticipation.events, event as EventAnticipation);
+  bool get isNotLastAnticipation => !isLastAnticipation;
+
+  bool get isLazy => _lazy;
+  set isLazy(bool value) {
+    _lazy = value;
+    if (value) {
+      event.anticipation.events = [];
+      event.reminder.delay = Delay(type: DelayType.not);
+      event.repeat.delay = Delay(type: DelayType.not);
+      event.postposition.limit = Lapse();
+    }
+    event.notifyChanges();
+  }
+
+  bool get isNotLazy => !isLazy;
+  set isNotLazy(bool value) => isLazy = !value;
+
+  bool get _dependent => isAnticipation || isReminder || isPostposition;
+
+  bool get isComplete =>
+      _complete || (_dependent && event.father.status.isComplete);
+  set isComplete(bool value) {
+    if (isPostposition) {
+      event.father.status.isComplete = value;
+    }
+    _complete = value;
+    event.notifyChanges();
+  }
+
+  bool get isNotComplete => !isComplete;
+  set isNotComplete(bool value) => isComplete = !value;
+
+  bool get isActive {
+    var now = DateTime.now();
+    return isNotComplete &&
+        (((now.isAfter(event.start) || now.isAtSameMomentAs(event.start)) &&
+                (now.isBefore(event.end) || now.isAtSameMomentAs(event.end))) ||
+            isLazy);
+  }
+
+  set isActive(bool value) => isComplete = !value;
+  bool get isNotActive => !isActive;
+  set isNotActive(bool value) => isActive = !value;
+
+  bool get isExpired =>
+      isNotComplete &&
+      (isPostposed || DateTime.now().isAfter(event.end) || isNotLazy);
+  bool get isNotExpired => !isExpired;
+
+  StatusManager(this.event);
+}
+
+abstract class Event {
+// Config
+  String get id;
+  set id(String value);
+  DateTime get lastUpadte;
+  set lastUpadte(DateTime value);
+  FromType get from;
+  EventType get type;
+  String get owner;
+  Event get father;
+// Utility
+  StatusManager get status;
+  TaskList get tasks;
+  Anticipation get anticipation;
+  Reminder get reminder;
+  Repeat get repeat;
+  Postpositon get postposition;
+
+// Vars
+  String get name;
+  set name(String value);
+
+  String get description;
+  set description(String value);
+
+  Tag get tag;
+  set tag(Tag value);
+
+  Icon get icon;
+  set icon(Icon value);
+
+  int get color;
+  set color(int value);
+
+  int get priority;
+  set priority(int value);
+
+  List<String> get shared;
+  set shared(List<String> value);
+
+  DateTime get start;
+  set start(DateTime value);
+
+  DateTime get end;
+  set end(DateTime value);
+
+  Lapse get length;
+  set length(Lapse value);
+
+  bool get isFullDay;
+  set isFullDay(bool value);
+
+// Functions
+  List<Event> selfAndChildren();
+  void notifyChanges();
+  void addShared(String email);
+  void removeShared(String email);
 }
 
 class EventFather implements Event {
+  // Private
+  String _name = "New";
+  String _description = "";
+  late Tag _tag;
+  late Icon _icon;
+  late int _color;
+  late int _priority;
+  List<String> _shared = [];
+  late Lapse _length;
+  bool _isFullDay = false;
+  late DateTime _start;
+
+  // Utility
+  @override
+  late final StatusManager status = StatusManager(this);
+  @override
+  late final TaskList tasks = TaskList(this);
+  @override
+  late final Anticipation anticipation = Anticipation(this);
+  @override
+  late final Reminder reminder = Reminder(this);
+  @override
+  late final Repeat repeat = Repeat(this);
+  @override
+  late final Postpositon postposition = Postpositon(this);
+
   // Config
   @override
-  late String id;
-  @override
-  DateTime lastUpadte = DateTime.now();
-  @override
-  EventType type = EventType.father;
+  final EventType type = EventType.father;
   @override
   late final FromType from;
   @override
+  late final Event father = this;
+  @override
+  late final String id;
+  @override
+  DateTime lastUpadte;
+  @override
   late final String owner;
+
+  // Get/Set
   @override
-  late Event father = this;
-  // Vars
+  String get name => _name;
   @override
-  String name = "New";
+  set name(String value) {
+    _name = value;
+    notifyChanges();
+  }
+
   @override
-  String description = "";
-  late Tag _tag;
+  String get description => _description;
+  @override
+  set description(String value) {
+    _description = value;
+    notifyChanges();
+  }
+
   @override
   Tag get tag => _tag;
   @override
@@ -93,41 +448,51 @@ class EventFather implements Event {
   }
 
   @override
-  late Icon icon;
+  Icon get icon => _icon;
   @override
-  late int color;
-  @override
-  late int priority;
-  @override
-  late List<String> shared;
-  bool _lazy = false;
-  @override
-  bool get isLazy => _lazy;
-  @override
-  set isLazy(bool value) {
-    _lazy = value;
-    if (value) {
-      anticipations = [];
-      reminderDelay = Delay(type: DelayType.not);
-      repeatDelay = Delay(type: DelayType.not);
-      pospositionLimit = Lapse();
-    }
+  set icon(Icon value) {
+    _icon = value;
+    notifyChanges();
   }
 
   @override
-  bool get isNotLazy => !isLazy;
+  int get color => _color;
   @override
-  set isNotLazy(bool value) => isLazy = !value;
-  late DateTime _start;
+  set color(int value) {
+    _color = value;
+    notifyChanges();
+  }
+
   @override
-  DateTime get start => isLazy
+  int get priority => _priority;
+  @override
+  set priority(int value) {
+    _priority = value;
+    notifyChanges();
+  }
+
+  @override
+  // ignore: unnecessary_string_interpolations
+  List<String> get shared => _shared.map((e) => '$e').toList();
+  @override
+  set shared(List<String> value) {
+    _shared = value;
+    notifyChanges();
+  }
+
+  @override
+  DateTime get start => status.isLazy
       ? DateTime.now()
       : DateTime(_start.year, _start.month, _start.day,
-          (fullDay) ? 0 : _start.hour, (fullDay) ? 0 : _start.minute);
+          (isFullDay) ? 0 : _start.hour, (isFullDay) ? 0 : _start.minute);
   @override
-  set start(DateTime value) => _start = value;
+  set start(DateTime value) {
+    _start = value;
+    notifyChanges();
+  }
+
   @override
-  DateTime get end => fullDay
+  DateTime get end => isFullDay
       ? Lapse(years: length.years, months: length.months, days: length.days)
           .applyOn(start)
       : length.applyOn(start);
@@ -139,211 +504,86 @@ class EventFather implements Event {
     } else {
       length = Lapse.between(value, start);
     }
-  }
-
-  late Lapse _length;
-  @override
-  Lapse get length => isLazy ? Lapse(days: 1) : _length;
-  @override
-  set length(Lapse value) => _length = value;
-  @override
-  late bool fullDay;
-  @override
-  List<Task> tasks = [];
-  // Status
-  @override
-  late bool isComplete = false;
-  @override
-  bool get isUncomplete => !isComplete;
-  @override
-  set isUncomplete(bool value) => isComplete = !value;
-  @override
-  bool get isActive {
-    var now = DateTime.now();
-    return isUncomplete &&
-        (((now.isAfter(start) || now.isAtSameMomentAs(start)) &&
-                (now.isBefore(end) || now.isAtSameMomentAs(end))) ||
-            isLazy);
+    notifyChanges();
   }
 
   @override
-  set isActive(bool value) => isComplete = !value;
+  Lapse get length => status.isLazy ? Lapse(days: 1) : _length;
   @override
-  bool get isInactive => !isActive;
-  @override
-  set isInactive(bool value) => isActive = !value;
-  @override
-  bool get isExpired =>
-      isUncomplete && ((isPosposed || DateTime.now().isAfter(end)) || isLazy);
-  @override
-  set isExpired(bool value) {}
-  @override
-  bool get isUnexpired => !isExpired;
-  @override
-  set isUnexpired(bool value) => isExpired = !value;
-  // Anticipation
-  @override
-  List<EventAnticipation> anticipations = [];
-  @override
-  bool isLastAnticipation() => false;
-
-  @override
-  void addAnticipationByDate(DateTime date) {
-    addAnticipationByLapse(Lapse.between(date, start));
+  set length(Lapse value) {
+    _length = value;
+    notifyChanges();
   }
 
   @override
-  void addAnticipationByLapse(Lapse lapse) {
-    anticipations.add(EventAnticipation(this, lapse));
+  bool get isFullDay => _isFullDay;
+  @override
+  set isFullDay(bool value) {
+    _isFullDay = value;
+    notifyChanges();
   }
 
-  // Posposition
-  Lapse _pospositionLimit = Lapse();
-  @override
-  Lapse get pospositionLimit => _pospositionLimit;
-  @override
-  set pospositionLimit(Lapse value) =>
-      _pospositionLimit = value.isPositive() ? value : Lapse();
-  @override
-  DateTime get pospositionLimitDate => pospositionLimit.applyOn(start);
-  @override
-  set pospositionLimitDate(DateTime value) =>
-      pospositionLimit = Lapse.between(start, value);
-  @override
-  Lapse pospositionPosposed = Lapse();
-  @override
-  Lapse get pospositionLapseLeft => pospositionLimit.take(pospositionPosposed);
-  @override
-  set pospositionLapseLeft(Lapse value) =>
-      pospositionPosposed = pospositionLimit.take(value);
-  @override
-  late EventPosposition posposition = EventPosposition(this, Lapse());
-  @override
-  bool isLastPosposition() => false;
-  @override
-  bool get isPosposed => pospositionPosposed.isNotEmpty();
-  @override
-  set isPosposed(bool value) {
-    if (!value) {
-      pospositionPosposed = Lapse();
-    }
-  }
-
-  @override
-  bool pospose(Lapse lapse) {
-    var result = lapse.add(pospositionPosposed);
-    if (pospositionLimit.isLessThan(result)) {
-      return false;
-    }
-    pospositionPosposed = result;
-    return true;
-  }
-
-  // Reminder
-  @override
-  List<EventReminder> reminders = [];
-  Delay _reminderDelay = Delay();
-  @override
-  Delay get reminderDelay => _reminderDelay;
-  @override
-  set reminderDelay(Delay value) {
-    _reminderDelay = value;
-    for (EventRepeat r in repeats) {
-      r.reminderDelay = value;
-    }
-    if (value.type == DelayType.not) {
-      reminders = [];
-      return;
-    }
-    Lapse l = value.toLapse();
-    DateTime s = l.applyOn(start);
-    int i = 0;
-    while (s.isBefore(end)) {
-      Lapse nl = l.multiply(i + 1);
-      if (reminders.length <= i) {
-        reminders.add(EventReminder(this, nl));
-      } else {
-        reminders[i].lapse = nl;
-      }
-      i++;
-    }
-  }
-
-  @override
-  bool isLastReminder() => false;
-  // Repeat
-  @override
-  List<EventRepeat> repeats = [];
-  Delay _repeatDelay = Delay();
-  @override
-  Delay get repeatDelay => _repeatDelay;
-  @override
-  set repeatDelay(Delay value) {
-    _repeatDelay = value;
-    if (value.type == DelayType.not) {
-      repeats = [];
-      return;
-    }
-    Lapse l = value.toLapse();
-    DateTime s = l.applyOn(start), ld = repeatLimitDate;
-    int i = 0;
-    while (s.isBefore(ld) && repeats.length < 100) {
-      Lapse nl = l.multiply(i + 1);
-      if (repeats.length <= i) {
-        repeats.add(EventRepeat(this, nl));
-      } else {
-        repeats[i].lapse = nl;
-      }
-      i++;
-    }
-  }
-
-  Lapse _repeatLimit = Lapse();
-  @override
-  Lapse get repeatLimit => _repeatLimit;
-  @override
-  set repeatLimit(Lapse value) {
-    _repeatLimit = value;
-    repeatDelay = repeatDelay;
-  }
-
-  @override
-  DateTime get repeatLimitDate => repeatLimit.isEmpty()
-      ? Lapse(years: 10).applyOn(start)
-      : repeatLimit.applyOn(start);
-  @override
-  set repeatLimitDate(DateTime value) =>
-      repeatLimit = Lapse.between(start, value);
-  @override
-  bool isLastRepeat() => false;
   // Functions
   @override
   List<Event> selfAndChildren() {
     List<Event> result = [this];
-    if (isNotLazy) {
-      for (Event e in [...anticipations, ...reminders, ...repeats]) {
+    if (status.isNotLazy) {
+      for (EventChild e in [
+        ...anticipation.events,
+        ...reminder.events,
+        ...repeat.events
+      ]) {
         result.addAll(e.selfAndChildren());
       }
-      if (isPosposed) {
-        result.addAll(posposition.selfAndChildren());
+      if (status.isPostposed) {
+        result.addAll(postposition.event.selfAndChildren());
       }
     }
     return result;
   }
 
-  EventFather(this.id, this.from, this.owner, this.lastUpadte, this._tag) {
-    type = EventType.father;
+  @override
+  void notifyChanges() {
+    lastUpadte = DateTime.now();
   }
 
-  EventFather.newEvent(this.from, this.owner, {Tag? tag}) {
+  @override
+  void addShared(String email) {
+    if (_shared.contains(email)) {
+      return;
+    }
+    notifyChanges();
+    _shared.add(email);
+  }
+
+  @override
+  void removeShared(String email) {
+    if (_shared.contains(email)) {
+      notifyChanges();
+      _shared.remove(email);
+    }
+  }
+
+  EventFather(this.id, this.from, this.owner, this.lastUpadte, this._tag);
+
+  EventFather.newEvent(this.from, this.owner, {Tag? tag})
+      : lastUpadte = DateTime.now(),
+        id = buildId() {
     this.tag = tag ?? Tag.appTag();
-    type = EventType.father;
-    lastUpadte = DateTime.now();
-    id = buildId();
   }
 }
 
-class EventChild implements Event {
+abstract class EventChild implements Event {
+  // Local
+  int position();
+
+  Lapse _lapse;
+  Lapse get lapse => _lapse;
+  set lapse(Lapse value) {
+    _lapse = value;
+    notifyChanges();
+  }
+
   // Config
   @override
   String get id => father.id;
@@ -356,18 +596,25 @@ class EventChild implements Event {
   @override
   FromType get from => father.from;
   @override
-  set from(FromType value) => father.from = value;
-  @override
-  late EventType type;
+  final EventType type;
   @override
   String get owner => father.owner;
   @override
-  set owner(String value) => father.owner = value;
+  final Event father;
+// Utility
   @override
-  late Event father;
+  TaskList get tasks => father.tasks;
+  @override
+  StatusManager get status => father.status;
+  @override
+  Anticipation get anticipation => father.anticipation;
+  @override
+  Postpositon get postposition => father.postposition;
+  @override
+  Reminder get reminder => father.reminder;
+  @override
+  Repeat get repeat => father.repeat;
 // Vars
-  late Lapse lapse;
-  int position() => 0;
   @override
   String get name => father.name;
   @override
@@ -397,376 +644,189 @@ class EventChild implements Event {
   @override
   set shared(List<String> value) => father.shared = value;
   @override
-  bool get isLazy => father.isLazy;
-  @override
-  set isLazy(bool value) => father.isLazy = value;
-  @override
-  bool get isNotLazy => father.isNotLazy;
-  @override
-  set isNotLazy(bool value) => father.isNotLazy = value;
-  @override
   DateTime get start => lapse.applyOn(father.start);
   @override
-  set start(DateTime value) => {};
+  Lapse get length => Lapse.between(start, end);
   @override
-  DateTime get end => father.end;
+  bool get isFullDay => father.isFullDay;
   @override
-  set end(DateTime value) => {};
-  @override
-  Lapse get length => father.length;
-  @override
-  set length(Lapse value) => father.length = value;
-  @override
-  bool get fullDay => father.fullDay;
-  @override
-  set fullDay(bool value) => father.fullDay = value;
-  @override
-  List<Task> get tasks => father.tasks;
-  @override
-  set tasks(List<Task> value) => father.tasks = value;
-  // Status
-  bool localComplete = false;
-  @override
-  bool get isComplete => father.isComplete || localComplete;
-  @override
-  set isComplete(bool value) => localComplete = value;
-  @override
-  bool get isUncomplete => !isComplete;
-  @override
-  set isUncomplete(bool value) => isComplete = !value;
-  @override
-  bool get isActive {
-    var now = DateTime.now();
-    return isUncomplete &&
-        (now.isAfter(start) || now.isAtSameMomentAs(start)) &&
-        (now.isBefore(end) || now.isAtSameMomentAs(end));
-  }
-
-  @override
-  set isActive(bool value) => localComplete = !value;
-  @override
-  bool get isInactive => !isActive;
-  @override
-  set isInactive(bool value) => isActive = !value;
-  @override
-  bool get isExpired =>
-      isUncomplete && (isPosposed || DateTime.now().isAfter(end));
-  @override
-  set isExpired(bool value) {}
-  @override
-  bool get isUnexpired => !isExpired;
-  @override
-  set isUnexpired(bool value) => isExpired = !value;
-// Anticipation
-  @override
-  List<EventAnticipation> get anticipations => father.anticipations;
-  @override
-  set anticipations(List<EventAnticipation> value) =>
-      father.anticipations = value;
-  @override
-  bool isLastAnticipation() => father.isLastAnticipation();
-  @override
-  void addAnticipationByDate(DateTime date) =>
-      father.addAnticipationByDate(date);
-  @override
-  void addAnticipationByLapse(Lapse lapse) =>
-      father.addAnticipationByLapse(lapse);
-// Posposition
-  @override
-  Lapse get pospositionLimit => father.pospositionLimit;
-  @override
-  set pospositionLimit(Lapse value) => father.pospositionLimit = value;
-  @override
-  DateTime get pospositionLimitDate => father.pospositionLimitDate;
-  @override
-  set pospositionLimitDate(DateTime value) =>
-      father.pospositionLimitDate = value;
-  @override
-  Lapse get pospositionPosposed => father.pospositionPosposed;
-  @override
-  set pospositionPosposed(Lapse value) => father.pospositionPosposed = value;
-  @override
-  Lapse get pospositionLapseLeft => father.pospositionLapseLeft;
-  @override
-  set pospositionLapseLeft(Lapse value) => father.pospositionLapseLeft = value;
-  @override
-  EventPosposition get posposition => father.posposition;
-  @override
-  set posposition(EventPosposition value) => father.posposition = value;
-  @override
-  bool isLastPosposition() => father.isLastPosposition();
-  @override
-  bool get isPosposed => father.isPosposed;
-  @override
-  set isPosposed(bool value) => father.isPosposed = value;
-  @override
-  bool pospose(Lapse lapse) => father.pospose(lapse);
-// Reminder
-  @override
-  List<EventReminder> get reminders => father.reminders;
-  @override
-  set reminders(List<EventReminder> value) => father.reminders = value;
-  @override
-  Delay get reminderDelay => father.reminderDelay;
-  @override
-  set reminderDelay(Delay value) => father.reminderDelay = value;
-  @override
-  bool isLastReminder() => father.isLastReminder();
-// Repeat
-  @override
-  List<EventRepeat> get repeats => father.repeats;
-  @override
-  set repeats(List<EventRepeat> value) => father.repeats = value;
-  @override
-  Delay get repeatDelay => father.repeatDelay;
-  @override
-  set repeatDelay(Delay value) => father.repeatDelay = value;
-  @override
-  Lapse get repeatLimit => father.repeatLimit;
-  @override
-  set repeatLimit(Lapse value) => father.repeatLimit = value;
-  @override
-  DateTime get repeatLimitDate => father.repeatLimitDate;
-  @override
-  set repeatLimitDate(DateTime value) => father.repeatLimitDate = value;
-  @override
-  bool isLastRepeat() => father.isLastRepeat();
+  set isFullDay(bool value) => father.isFullDay = value;
 // Functions
   @override
   List<Event> selfAndChildren() => [this];
+  @override
+  void notifyChanges() => father.notifyChanges();
+  @override
+  void addShared(String email) => father.addShared(email);
+  @override
+  void removeShared(String email) => father.removeShared(email);
 
-  EventChild(this.father, this.lapse);
+  EventChild(this.father, this.type, this._lapse);
 }
 
 class EventAnticipation extends EventChild {
   @override
-  int position() => father.anticipations.indexOf(this);
-  // Vars
+  int position() => father.anticipation.events.indexOf(this);
+
   @override
-  set start(DateTime value) => lapse = Lapse.between(value, father.start);
+  late final StatusManager status = StatusManager(this);
   @override
-  DateTime get end =>
-      isLastAnticipation() ? father.start : anticipations[position() + 1].start;
-  // Anticipation
+  late final Postpositon postposition = Postpositon(this);
+
   @override
-  bool isLastAnticipation() => position() == father.anticipations.length;
-  // Posposition
-  @override
-  Lapse get pospositionLimit => Lapse.between(
-      end,
-      isLastAnticipation()
-          ? father.start
-          : father.anticipations[position() + 1].start);
-  @override
-  set pospositionLimit(Lapse value) => {};
-  @override
-  DateTime get pospositionLimitDate => isLastAnticipation()
-      ? father.start
-      : father.anticipations[position() + 1].start;
-  @override
-  set pospositionLimitDate(DateTime value) => {};
-  @override
-  Lapse pospositionPosposed = Lapse();
-  @override
-  Lapse get pospositionLapseLeft => pospositionLimit.take(pospositionPosposed);
-  @override
-  set pospositionLapseLeft(Lapse value) =>
-      pospositionPosposed = pospositionLimit.take(value);
-  @override
-  late EventPosposition posposition = EventPosposition(this, Lapse());
-  @override
-  bool isLastPosposition() => false;
-  @override
-  bool get isPosposed => pospositionPosposed.isNotEmpty();
-  @override
-  set isPosposed(bool value) {
-    if (!value) {
-      pospositionPosposed = Lapse();
-    }
+  set start(DateTime value) {
+    lapse = Lapse.between(value, father.start);
+    notifyChanges();
   }
 
   @override
-  bool pospose(Lapse lapse) {
-    var result = lapse.add(pospositionPosposed);
-    if (pospositionLimit.isLessThan(result)) {
-      return false;
-    }
-    pospositionPosposed = result;
-    return true;
-  }
-
-  // Funs
+  DateTime get end => (status.isLastAnticipation
+          ? father
+          : father.anticipation.events[position() + 1])
+      .start;
   @override
-  List<Event> selfAndChildren() => isPosposed ? [this, posposition] : [this];
-
-  EventAnticipation(Event father, Lapse lapse) : super(father, lapse) {
-    type = EventType.anticipation;
+  set end(DateTime value) {
+    lapse = Lapse.between(start, value).toNegative();
   }
+
+  @override
+  set length(Lapse value) {
+    end = value.applyOn(start);
+  }
+
+  EventAnticipation(Event father, Lapse lapse)
+      : super(father, EventType.anticipation, lapse) {
+    postposition.limit = father.postposition.limit;
+  }
+
+  @override
+  List<Event> selfAndChildren() =>
+      status.isPostposed ? [this, postposition.event] : [this];
 }
 
 class EventReminder extends EventChild {
   @override
-  int position() => father.reminders.indexOf(this);
-  // Vars
-  @override
-  List<Task> tasks = [];
-  @override
-  DateTime get end =>
-      isLastReminder() ? father.end : reminders[position() + 1].start;
+  int position() => father.reminder.events.indexOf(this);
 
-  EventReminder(Event father, Lapse lapse) : super(father, lapse) {
-    type = EventType.reminder;
+  @override
+  late final StatusManager status = StatusManager(this);
+
+  @override
+  set start(DateTime value) {}
+
+  @override
+  DateTime get end => status.isLastReminder
+      ? father.end
+      : father.reminder.events[position() + 1].start;
+  @override
+  set end(DateTime value) {}
+
+  @override
+  set length(Lapse value) {
+    end = value.applyOn(start);
   }
+
+  EventReminder(Event father, Lapse lapse)
+      : super(father, EventType.reminder, lapse);
 }
 
 class EventRepeat extends EventChild {
   @override
-  int position() => father.repeats.indexOf(this);
+  int position() => father.repeat.events.indexOf(this);
+// Utility
   @override
-  DateTime get end => length.applyOn(start);
-  // Status
+  late final StatusManager status = StatusManager(this);
   @override
-  bool isComplete = false;
+  late final TaskList tasks = TaskList(this);
   @override
-  bool get isUncomplete => !isComplete;
+  late final Anticipation anticipation = Anticipation(this);
   @override
-  set isUncomplete(bool value) => isComplete = !value;
+  late final Reminder reminder = Reminder(this);
   @override
-  bool get isActive {
-    var now = DateTime.now();
-    return isUncomplete &&
-        (((now.isAfter(start) || now.isAtSameMomentAs(start)) &&
-                (now.isBefore(end) || now.isAtSameMomentAs(end))) ||
-            isLazy);
-  }
+  late final Postpositon postposition = Postpositon(this);
+// Vars
+  @override
+  DateTime get start => lapse.applyOn(father.start);
+  @override
+  set start(DateTime value) => length = Lapse.between(value, end);
 
   @override
-  set isActive(bool value) => isComplete = !value;
+  DateTime get end => lapse.applyOn(father.end);
   @override
-  bool get isInactive => !isActive;
-  @override
-  set isInactive(bool value) => isActive = !value;
-  @override
-  bool get isExpired =>
-      isUncomplete && ((isPosposed || DateTime.now().isAfter(end)) || isLazy);
-  @override
-  set isExpired(bool value) {}
-  @override
-  bool get isUnexpired => !isExpired;
-  @override
-  set isUnexpired(bool value) => isExpired = !value;
-  // Anticipation
-  @override
-  List<EventAnticipation> anticipations = [];
+  set end(DateTime value) => father.end = lapse.invert().applyOn(value);
 
   @override
-  void addAnticipationByDate(DateTime date) {
-    addAnticipationByLapse(Lapse.between(date, start));
-  }
+  Lapse get length => father.length;
+  @override
+  set length(Lapse value) => father.length = value;
 
-  @override
-  void addAnticipationByLapse(Lapse lapse) {
-    anticipations.add(EventAnticipation(this, lapse));
-  }
-
-  // Posposition
-  @override
-  DateTime get pospositionLimitDate => pospositionLimit.applyOn(start);
-  @override
-  set pospositionLimitDate(DateTime value) =>
-      pospositionLimit = Lapse.between(start, value);
-  @override
-  Lapse pospositionPosposed = Lapse();
-  @override
-  Lapse get pospositionLapseLeft => pospositionLimit.take(pospositionPosposed);
-  @override
-  set pospositionLapseLeft(Lapse value) =>
-      pospositionPosposed = pospositionLimit.take(value);
-  @override
-  late EventPosposition posposition = EventPosposition(this, Lapse());
-  @override
-  bool get isPosposed => pospositionPosposed.isNotEmpty();
-  @override
-  set isPosposed(bool value) {
-    if (!value) {
-      pospositionPosposed = Lapse();
+  EventRepeat(Event father, Lapse lapse)
+      : super(father, EventType.reminder, lapse) {
+    for (EventAnticipation it in father.anticipation.events) {
+      anticipation.addByLapse(it.lapse);
     }
+    postposition.limit = father.postposition.limit;
+    reminder.delay = father.reminder.delay;
+    tasks.incorporateAll(father.tasks.toList());
   }
 
-  @override
-  bool pospose(Lapse lapse) {
-    var result = lapse.add(pospositionPosposed);
-    if (pospositionLimit.isLessThan(result)) {
-      return false;
-    }
-    pospositionPosposed = result;
-    return true;
-  }
-
-  // Reminder
-  @override
-  List<EventReminder> reminders = [];
-  Delay _reminderDelay = Delay();
-  @override
-  Delay get reminderDelay => _reminderDelay;
-  @override
-  set reminderDelay(Delay value) {
-    _reminderDelay = value;
-    if (value.type == DelayType.not) {
-      reminders = [];
-      return;
-    }
-    Lapse l = value.toLapse();
-    DateTime s = l.applyOn(start);
-    int i = 0;
-    while (s.isBefore(end)) {
-      Lapse nl = l.multiply(i + 1);
-      if (reminders.length <= i) {
-        reminders.add(EventReminder(this, nl));
-      } else {
-        reminders[i].lapse = nl;
-      }
-      i++;
-    }
-  }
-
-  // Repeat
-  @override
-  bool isLastRepeat() => position() == father.repeats.length;
-  // Functions
+// Functions
   @override
   List<Event> selfAndChildren() {
     List<Event> result = [this];
-    if (isNotLazy) {
-      for (Event e in [...anticipations, ...reminders]) {
+    if (status.isNotLazy) {
+      for (EventChild e in [...anticipation.events, ...reminder.events]) {
         result.addAll(e.selfAndChildren());
       }
-      if (isPosposed) {
-        result.addAll(posposition.selfAndChildren());
+      if (status.isPostposed) {
+        result.addAll(postposition.event.selfAndChildren());
       }
     }
     return result;
   }
-
-  EventRepeat(Event father, Lapse lapse) : super(father, lapse) {
-    type = EventType.repeat;
-    for (Task t in father.tasks) {
-      tasks.add(Task(t.id, t.position, t.description, false));
-    }
-    tasks.sort((a, b) => b.position.compareTo(a.position));
-    for (EventAnticipation a in father.anticipations) {
-      addAnticipationByLapse(a.lapse);
-    }
-    reminderDelay = father.reminderDelay;
-  }
 }
 
-class EventPosposition extends EventChild {
+class EventPostposition extends EventChild {
   @override
-  DateTime get start => pospositionPosposed.applyOn(father.start);
+  int position() => 0;
+
   @override
-  set start(DateTime value) => lapse = Lapse.between(father.start, value);
-  EventPosposition(Event father, Lapse lapse) : super(father, lapse) {
-    type = EventType.posposition;
+  late final StatusManager status = StatusManager(this);
+
+  @override
+  late final Reminder reminder = Reminder(this);
+  @override
+  late final Anticipation anticipation = Anticipation(this);
+
+  @override
+  DateTime get start => father.postposition.postposed.applyOn(father.start);
+  @override
+  set start(DateTime value) =>
+      father.postposition.postpose(Lapse.between(value, start));
+
+  @override
+  Lapse get lapse => father.postposition.postposed;
+  @override
+  set lapse(Lapse value) => father.postposition.postposed = value;
+
+  @override
+  Lapse get length => father.length;
+  @override
+  set length(Lapse value) => father.length;
+
+  EventPostposition(Event father, Lapse lapse)
+      : super(father, EventType.postposition, lapse) {
+    reminder.delay = father.reminder.delay.clone();
+    for (EventAnticipation it in father.anticipation.events) {
+      anticipation.addByLapse(it.lapse);
+    }
   }
+
+  @override
+  List<Event> selfAndChildren() => [this];
+
+  @override
+  DateTime get end => lapse.applyOn(father.end);
+  @override
+  set end(DateTime value) => father.length = Lapse.between(start, value);
 }

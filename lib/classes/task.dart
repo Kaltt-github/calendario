@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:calendario/classes/funs.dart';
 
+import 'events.dart';
+
 class Task {
   late String id;
   late int position;
@@ -16,9 +18,29 @@ class Task {
 
 class TaskList {
   final List<Task> _tasks = [];
+  final Event father;
+
+  TaskList(this.father);
+
+  bool Function(Task it) _byId(String id) => (it) => it.id == id;
+
+  void _refreshPositions(String idKeep) {
+    Task t = _tasks.firstWhere(_byId(idKeep));
+    int keep = _tasks.indexWhere(_byId(idKeep));
+    for (Task it in _tasks) {
+      if (it.position >= keep) {
+        it.position++;
+      }
+    }
+    t.position = keep;
+    _tasks.sort((a, b) => a.position.compareTo(b.position));
+    for (int i = 0; i < _tasks.length; i++) {
+      _tasks[i].position = i;
+    }
+  }
 
   void incorporate(Task task) {
-    var aux = _tasks.where((it) => it.id == task.id);
+    var aux = _tasks.where(_byId(task.id));
     if (aux.isEmpty) {
       _tasks.add(task);
     } else {
@@ -28,14 +50,7 @@ class TaskList {
         ..position = task.position;
       task = aux.first;
     }
-    int i = task.position;
-    for (Task it in _tasks) {
-      if (it.position >= i) {
-        it.position++;
-      }
-    }
-    task.position = i;
-    _tasks.sort();
+    _refreshPositions(task.id);
   }
 
   void incorporateAll(List<Task> tasks) {
@@ -51,12 +66,11 @@ class TaskList {
     }
   }
 
-  void removeId(String id) =>
-      removeAt(_tasks.firstWhere((it) => it.id == id).position);
+  void removeId(String id) => removeAt(_tasks.firstWhere(_byId(id)).position);
 
   void updateId(String id,
       {int? position, String? description, bool? isComplete}) {
-    Task task = _tasks.firstWhere((it) => it.id == id);
+    Task task = _tasks.firstWhere(_byId(id));
     if (position != null) {
       for (Task it in _tasks) {
         if (it.position >= position) {
@@ -64,7 +78,10 @@ class TaskList {
         }
       }
       task.position = position;
-      _tasks.sort();
+      _tasks.sort((a, b) => a.position.compareTo(b.position));
+      for (int i = 0; i < _tasks.length; i++) {
+        _tasks[i].position = i;
+      }
     }
     if (description != null) {
       task.description = description;
@@ -84,7 +101,12 @@ class TaskList {
   }
 
   Task operator [](int index) {
-    Task task = _tasks[index];
+    Task task;
+    try {
+      task = _tasks[index];
+    } catch (e) {
+      task = _tasks.last;
+    }
     return Task(task.id, task.position, task.description, task.isComplete);
   }
 
@@ -103,5 +125,11 @@ class TaskList {
   void addNewTask(String description) =>
       addTask(Task.newTask(0, description, false));
 
-  List<Task> toList() => _tasks.map((e) => e).toList();
+  List<Task> toList() {
+    List<Task> listtask = [];
+    for (int i = 0; i < _tasks.length; i++) {
+      listtask.add(this[i]);
+    }
+    return listtask;
+  }
 }

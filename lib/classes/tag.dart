@@ -1,4 +1,4 @@
-import 'package:calendario/classes/funs.dart';
+import 'funs.dart';
 import 'time.dart';
 import 'enums.dart';
 import 'events.dart';
@@ -20,7 +20,7 @@ class Tag {
   late bool fullDay;
   late List<Task> tasks;
   late List<Lapse> anticipations;
-  late Lapse pospositionLimit;
+  late Lapse postpositionLimit;
   late Delay reminderDelay;
   late Delay repeatDelay;
   late Lapse repeatLimit;
@@ -41,7 +41,7 @@ class Tag {
       this.fullDay,
       this.tasks,
       this.anticipations,
-      this.pospositionLimit,
+      this.postpositionLimit,
       this.reminderDelay,
       this.repeatDelay,
       this.repeatLimit);
@@ -61,7 +61,7 @@ class Tag {
       this.fullDay,
       this.tasks,
       this.anticipations,
-      this.pospositionLimit,
+      this.postpositionLimit,
       this.reminderDelay,
       this.repeatDelay,
       this.repeatLimit) {
@@ -96,16 +96,17 @@ class Tag {
     e.shared = shared;
     e.start = start;
     e.length = length;
-    e.fullDay = fullDay;
-    e.tasks.addAll(tasks);
+    e.isFullDay = fullDay;
+    e.tasks.clear();
+    e.tasks.incorporateAll(tasks);
     for (Lapse a in anticipations) {
-      e.addAnticipationByLapse(a);
+      e.anticipation.addByLapse(a);
     }
-    e.pospositionLimit = pospositionLimit;
-    e.reminderDelay = reminderDelay;
-    e.repeatDelay = repeatDelay;
-    e.repeatLimit = repeatLimit;
-    e.isLazy = lazy;
+    e.postposition.limit = postpositionLimit;
+    e.reminder.delay = reminderDelay;
+    e.repeat.delay = repeatDelay;
+    e.repeat.limit = repeatLimit;
+    e.status.isLazy = lazy;
   }
 
   Tag clone() => Tag(
@@ -124,7 +125,7 @@ class Tag {
       fullDay,
       tasks,
       anticipations,
-      pospositionLimit,
+      postpositionLimit,
       reminderDelay,
       repeatDelay,
       repeatLimit);
