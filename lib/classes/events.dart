@@ -3,7 +3,7 @@ import 'package:calendario/classes/funs.dart';
 import 'time.dart';
 import 'enums.dart';
 import 'tag.dart';
-import 'task.dart';
+import 'tasks.dart';
 
 class Anticipation {
   final Event _event;
@@ -12,7 +12,7 @@ class Anticipation {
 
   void addByLapse(Lapse lapse) {
     if (_event.status.isFather) {
-      if (events.where((it) => it.lapse.isEqual(lapse)).isNotEmpty) {
+      if (events.where((it) => it.lapse == lapse).isNotEmpty) {
         return;
       }
       for (Event it in [
@@ -38,7 +38,7 @@ class Anticipation {
         ..._event.repeat.events,
         _event.postposition.event
       ]) {
-        it.anticipation.events.removeWhere((it) => it.lapse.isEqual(lapse));
+        it.anticipation.events.removeWhere((it) => it.lapse == lapse);
       }
       _event.notifyChanges();
     } else {
@@ -58,7 +58,8 @@ class Reminder {
   Delay _delay = Delay();
   List<EventReminder> events = [];
 
-  Delay get delay => _delay;
+  Delay get delay =>
+      _event.status.isFather ? _delay : _event.father.reminder.delay;
   set delay(Delay value) {
     if (_event.status.isFather) {
       if (value.type == DelayType.not) {
@@ -83,7 +84,7 @@ class Reminder {
           DateTime start = lapse.applyOn(it.start);
           int i = 0;
           while (start.isBefore(it.end)) {
-            Lapse nl = lapse.multiply(i + 1);
+            Lapse nl = lapse * (i + 1);
             if (subevents.length <= i) {
               subevents.add(EventReminder(it, nl));
             } else {
@@ -141,7 +142,7 @@ class Repeat {
   Lapse get limit => _limit;
   set limit(Lapse value) {
     if (_event.status.isFather) {
-      if (_limit.isLessThan(value)) {
+      if (_limit < value) {
         _limit = value;
         events.removeWhere((it) => it.start.isAfter(limitDate));
         _event.notifyChanges();
@@ -170,7 +171,8 @@ class Postpositon {
   Lapse _postposed = Lapse();
   EventPostposition event;
 
-  Lapse get limit => _limit;
+  Lapse get limit =>
+      _event.status.isFather ? _limit : _event.father.postposition.limit;
   set limit(Lapse value) {
     if (_event.status.isFather) {
       value = value.isPositive() ? value : Lapse();
@@ -180,7 +182,7 @@ class Postpositon {
         ..._event.repeat.events
       ]) {
         it.postposition._limit = value;
-        if (it.postposition.postposed.isMoreThan(value)) {
+        if (it.postposition.postposed > value) {
           it.postposition.postposed = value.clone();
         }
       }
@@ -201,11 +203,11 @@ class Postpositon {
     _event.notifyChanges();
   }
 
-  Lapse get lapseLeft => limit.take(postposed);
-  set lapseLeft(Lapse value) => postposed = limit.take(value);
+  Lapse get lapseLeft => limit - postposed;
+  set lapseLeft(Lapse value) => postposed = limit - value;
 
   bool postpose(Lapse lapse) {
-    var result = lapse.add(postposed);
+    var result = lapse + postposed;
     if (result.isMoreThan(limit)) {
       return false;
     }
@@ -302,27 +304,28 @@ class StatusManager {
   bool get isNotComplete => !isComplete;
   set isNotComplete(bool value) => isComplete = !value;
 
-  bool get isActive {
-    var now = DateTime.now();
-    return isNotComplete &&
-        (((now.isAfter(event.start) || now.isAtSameMomentAs(event.start)) &&
-                (now.isBefore(event.end) || now.isAtSameMomentAs(event.end))) ||
-            isLazy);
-  }
+  bool get isActive => isNotComplete && (isInDate || isLazy);
 
   set isActive(bool value) => isComplete = !value;
   bool get isNotActive => !isActive;
   set isNotActive(bool value) => isActive = !value;
 
   bool get isExpired =>
-      isNotComplete &&
-      (isPostposed || DateTime.now().isAfter(event.end) || isNotLazy);
+      isNotComplete && (isPostposed || isNotInDate || isNotLazy);
   bool get isNotExpired => !isExpired;
+
+  bool get isInDate {
+    var now = DateTime.now();
+    return (now.isAfter(event.start) || now.isAtSameMomentAs(event.start)) &&
+        (now.isBefore(event.end) || now.isAtSameMomentAs(event.end));
+  }
+
+  bool get isNotInDate => !isInDate;
 
   StatusManager(this.event);
 }
 
-abstract class Event {
+abstract class Event implements Comparable {
 // Config
   String get id;
   set id(String value);
@@ -379,6 +382,10 @@ abstract class Event {
   void notifyChanges();
   void addShared(String email);
   void removeShared(String email);
+  @override
+  bool operator ==(Object other);
+  @override
+  int get hashCode;
 }
 
 class EventFather implements Event {
@@ -571,6 +578,26 @@ class EventFather implements Event {
         id = buildId() {
     this.tag = tag ?? Tag.appTag();
   }
+  @override
+  int compareTo(other) {
+    if (other is Event) {
+      if (other.start.isBefore(start)) {
+        return -1;
+      }
+      if (other.start.isAfter(start)) {
+        return 1;
+      }
+      return 0;
+    } else {
+      return 1;
+    }
+  }
+
+  @override
+  bool operator ==(Object other) => other is EventFather && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 abstract class EventChild implements Event {
@@ -660,6 +687,30 @@ abstract class EventChild implements Event {
   void addShared(String email) => father.addShared(email);
   @override
   void removeShared(String email) => father.removeShared(email);
+  @override
+  int compareTo(other) {
+    if (other is Event) {
+      if (other.start.isBefore(start)) {
+        return -1;
+      }
+      if (other.start.isAfter(start)) {
+        return 1;
+      }
+      return 0;
+    } else {
+      return 1;
+    }
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is EventChild &&
+      other.father == father &&
+      other.type == type &&
+      other.position() == position();
+
+  @override
+  int get hashCode => id.hashCode;
 
   EventChild(this.father, this.type, this._lapse);
 }

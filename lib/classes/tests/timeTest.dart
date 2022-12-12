@@ -175,10 +175,10 @@ void testLapse() {
       j = Lapse(days: 1),
       k = Lapse(days: 2),
       m = Lapse(hours: 24);
-  if (!a.isAtSameMomentAs(h)) {
+  if (!a.isAtSameMomentAs(g)) {
     print('$a != $h');
   }
-  if (!b.isAtSameMomentAs(g)) {
+  if (!b.isAtSameMomentAs(h)) {
     print('$b != $g');
   }
   if (i.isNotEmpty || Lapse().isNotEmpty) {
@@ -196,6 +196,17 @@ void testLapse() {
       j.isDifferent(k))) {
     print(
         '${j.isLessThan(k)} && ${j.isLessOrEqual(k)} && ${j.isLessOrEqual(m)} && ${j.isEqual(m)} && ${k.isMoreOrEqual(j)} && ${k.isMoreThan(j)} && ${j.isDifferent(k)}');
+  }
+  if (!(j < k &&
+      j <= k &&
+      j <= m &&
+      j == m &&
+      (j != m) == false &&
+      k >= j &&
+      k > j &&
+      j != k)) {
+    print(
+        '${j < k} && ${j <= k} && ${j <= m} && ${j == m} && ${j != m} == false && ${k >= j} && ${k > j} && ${j != k}');
   }
   if (!d.isPositive() || d.isNegative()) {
     print('d positive error');
@@ -298,5 +309,11 @@ void testLapse() {
 void main() {
   testDelay();
   testLapse();
+  var a = Lapse(years: 6, minutes: 8),
+      b = Lapse(hours: 7, minutes: 3),
+      c = a + b,
+      d = a - b,
+      e = a / 2,
+      f = b * 3;
   print('Fin del test');
 }

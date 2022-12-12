@@ -2,7 +2,7 @@ import 'funs.dart';
 import 'time.dart';
 import 'enums.dart';
 import 'events.dart';
-import 'task.dart';
+import 'tasks.dart';
 
 class Tag {
   late String id;

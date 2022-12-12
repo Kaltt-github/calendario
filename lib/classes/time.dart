@@ -109,17 +109,24 @@ class Lapse {
   // Compare
   bool get isEmpty => _mins() == 0;
   bool get isNotEmpty => !isEmpty;
+
   bool isMoreThan(Lapse x) => _mins() > x._mins();
+  bool operator >(Lapse x) => isMoreThan(x);
 
   bool isLessThan(Lapse x) => _mins() < x._mins();
+  bool operator <(Lapse x) => isLessThan(x);
 
   bool isEqual(Lapse x) => _mins() == x._mins();
+  @override
+  bool operator ==(Object other) => other is Lapse && isEqual(other);
 
   bool isDifferent(Lapse x) => !isEqual(x);
 
   bool isMoreOrEqual(Lapse x) => _mins() >= x._mins();
+  bool operator >=(Lapse x) => isMoreOrEqual(x);
 
   bool isLessOrEqual(Lapse x) => _mins() <= x._mins();
+  bool operator <=(Lapse x) => isLessOrEqual(x);
 
   bool isPositive() => _mins() > 0;
 
@@ -132,6 +139,7 @@ class Lapse {
         hours: hours - x.hours,
         minutes: minutes - x.minutes,
       );
+  Lapse operator -(Lapse x) => take(x);
 
   Lapse add(Lapse x) => Lapse(
         years: years + x.years,
@@ -140,6 +148,7 @@ class Lapse {
         hours: hours + x.hours,
         minutes: minutes + x.minutes,
       );
+  Lapse operator +(Lapse x) => add(x);
 
   Lapse multiply(int i) => Lapse(
         years: years * i,
@@ -148,6 +157,7 @@ class Lapse {
         hours: hours * i,
         minutes: minutes * i,
       );
+  Lapse operator *(int x) => multiply(x);
 
   Lapse divide(int i) => Lapse(
         years: years ~/ i,
@@ -156,6 +166,7 @@ class Lapse {
         hours: hours ~/ i,
         minutes: minutes ~/ i,
       );
+  Lapse operator /(int x) => divide(x);
 
   Lapse invert() => multiply(-1);
 
@@ -165,4 +176,7 @@ class Lapse {
   //
   Lapse clone() => Lapse(
       years: years, months: months, days: days, hours: hours, minutes: minutes);
+
+  @override
+  int get hashCode => _mins.hashCode;
 }
