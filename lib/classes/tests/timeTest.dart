@@ -162,6 +162,13 @@ void testDelay() {
   if (t1.type != t2 || t1.amount != t3) {
     print('${t1.type} != $t2 || ${t1.amount} != $t3');
   }
+
+  var zz = Delay(type: DelayType.month, amount: 2),
+      xx = Lapse(months: 3),
+      vv = zz.clone().limited(min: xx),
+      nn = Lapse(days: 7),
+      mm = zz.clone().limited(max: nn);
+  print("A");
 }
 
 void testLapse() {
@@ -187,16 +194,6 @@ void testLapse() {
   if (c.isEmpty) {
     print('not empty error');
   }
-  if (!(j.isLessThan(k) &&
-      j.isLessOrEqual(k) &&
-      j.isLessOrEqual(m) &&
-      j.isEqual(m) &&
-      k.isMoreOrEqual(j) &&
-      k.isMoreThan(j) &&
-      j.isDifferent(k))) {
-    print(
-        '${j.isLessThan(k)} && ${j.isLessOrEqual(k)} && ${j.isLessOrEqual(m)} && ${j.isEqual(m)} && ${k.isMoreOrEqual(j)} && ${k.isMoreThan(j)} && ${j.isDifferent(k)}');
-  }
   if (!(j < k &&
       j <= k &&
       j <= m &&
@@ -215,10 +212,10 @@ void testLapse() {
     print('c negative error');
   }
   var aa = Lapse(years: 1, months: 2, days: -3, hours: 5, minutes: -5),
-      bb = aa.take(Lapse(months: 1, days: -1)),
-      cc = aa.add(Lapse(years: 3, minutes: 10)),
-      dd = aa.multiply(3),
-      ee = aa.divide(2),
+      bb = aa - Lapse(months: 1, days: -1),
+      cc = aa + Lapse(years: 3, minutes: 10),
+      dd = aa * 3,
+      ee = aa / 2,
       ff = aa.invert(),
       gg = aa.clone(),
       yr = 1,
@@ -309,11 +306,5 @@ void testLapse() {
 void main() {
   testDelay();
   testLapse();
-  var a = Lapse(years: 6, minutes: 8),
-      b = Lapse(hours: 7, minutes: 3),
-      c = a + b,
-      d = a - b,
-      e = a / 2,
-      f = b * 3;
   print('Fin del test');
 }

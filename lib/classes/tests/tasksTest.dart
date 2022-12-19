@@ -8,7 +8,7 @@ import '../events.dart';
 void showT(Task t) => print('${t.position} ${t.description} ${t.isComplete}');
 
 void show(TaskList ts) {
-  print('Size ${ts.size()}');
+  print('Size ${ts.size}');
   ts.toList().forEach((t) => showT(t));
   print('------------------------');
 }
@@ -32,7 +32,7 @@ void main(List<String> args) {
   show(ts);
   ts.removeId(t4.id);
   show(ts);
-  ts.updateId(t2.id, position: 4, description: "Wowo?");
+  ts.updateById(t2.id, position: 4, description: "Wowo?");
   show(ts);
   ts.updateAt(1, description: "meow");
   show(ts);

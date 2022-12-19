@@ -12,6 +12,7 @@ class Anticipation {
 
   void addByLapse(Lapse lapse) {
     if (_event.status.isFather) {
+      lapse = lapse.limited(max: Lapse(minutes: -1));
       if (events.where((it) => it.lapse == lapse).isNotEmpty) {
         return;
       }
@@ -24,7 +25,7 @@ class Anticipation {
       }
       _event.notifyChanges();
     } else {
-      _event.father.anticipation.addByLapse(lapse);
+      getFather(_event).anticipation.addByLapse(lapse);
     }
   }
 
@@ -42,7 +43,7 @@ class Anticipation {
       }
       _event.notifyChanges();
     } else {
-      _event.father.anticipation.removeByLapse(lapse);
+      getFather(_event).anticipation.removeByLapse(lapse);
     }
   }
 
@@ -59,9 +60,10 @@ class Reminder {
   List<EventReminder> events = [];
 
   Delay get delay =>
-      _event.status.isFather ? _delay : _event.father.reminder.delay;
+      _event.status.isFather ? _delay : getFather(_event).reminder.delay;
   set delay(Delay value) {
     if (_event.status.isFather) {
+      value = value.limited(min: Lapse(minutes: 1), max: _event.length);
       if (value.type == DelayType.not) {
         for (Event it in [
           _event,
@@ -97,7 +99,7 @@ class Reminder {
       }
       _event.notifyChanges();
     } else {
-      _event.father.reminder.delay = value;
+      getFather(_event).reminder.delay = value;
     }
   }
 
@@ -114,6 +116,7 @@ class Repeat {
   Delay get delay => _delay;
   set delay(Delay value) {
     if (_event.status.isFather) {
+      value = value.limited(min: _event.length, max: _event.length);
       _delay = value;
       if (value.type == DelayType.not) {
         events = [];
@@ -123,7 +126,7 @@ class Repeat {
       DateTime start = lapse.applyOn(_event.start), limit = limitDate;
       int i = 0;
       while (start.isBefore(limit) && events.length < 100) {
-        Lapse newlapse = lapse.multiply(i + 1);
+        Lapse newlapse = lapse * (i + 1);
         if (events.length <= i) {
           events.add(EventRepeat(_event, newlapse));
         } else {
@@ -131,17 +134,18 @@ class Repeat {
         }
         i++;
       }
-      events = events.sublist(i);
+      events = events.sublist(0, i);
 
       _event.notifyChanges();
     } else {
-      _event.father.repeat.delay = value;
+      getFather(_event).repeat.delay = value;
     }
   }
 
   Lapse get limit => _limit;
   set limit(Lapse value) {
     if (_event.status.isFather) {
+      limit = limit.limited(min: Lapse());
       if (_limit < value) {
         _limit = value;
         events.removeWhere((it) => it.start.isAfter(limitDate));
@@ -151,15 +155,14 @@ class Repeat {
         delay = delay.clone();
       }
     } else {
-      _event.father.repeat.limit = value;
+      getFather(_event).repeat.limit = value;
     }
   }
 
   DateTime get limitDate =>
       (limit.isEmpty ? Lapse(years: 10) : limit).applyOn(_event.start);
-  set repeatLimitDate(DateTime value) {
-    limit = Lapse.between(_event.start, value);
-  }
+  set repeatLimitDate(DateTime value) =>
+      limit = Lapse.between(_event.start, value);
 
   Repeat(this._event);
 }
@@ -172,10 +175,10 @@ class Postpositon {
   EventPostposition event;
 
   Lapse get limit =>
-      _event.status.isFather ? _limit : _event.father.postposition.limit;
+      _event.status.isFather ? _limit : getFather(_event).postposition.limit;
   set limit(Lapse value) {
     if (_event.status.isFather) {
-      value = value.isPositive() ? value : Lapse();
+      value = value.limited(min: Lapse());
       for (Event it in [
         _event,
         ..._event.anticipation.events,
@@ -188,18 +191,16 @@ class Postpositon {
       }
       _event.notifyChanges();
     } else {
-      _event.father.postposition.limit = value;
+      getFather(_event).postposition.limit = value;
     }
   }
 
   DateTime get limitDate => limit.applyOn(_event.start);
-  set limitDate(DateTime value) {
-    limit = Lapse.between(_event.start, value);
-  }
+  set limitDate(DateTime value) => limit = Lapse.between(_event.start, value);
 
   Lapse get postposed => _postposed;
   set postposed(Lapse value) {
-    _postposed = value;
+    _postposed = value.limited(min: Lapse());
     _event.notifyChanges();
   }
 
@@ -208,7 +209,7 @@ class Postpositon {
 
   bool postpose(Lapse lapse) {
     var result = lapse + postposed;
-    if (result.isMoreThan(limit)) {
+    if (result >= limit) {
       return false;
     }
     postposed = result;
@@ -322,6 +323,12 @@ class StatusManager {
 
   bool get isNotInDate => !isInDate;
 
+  bool get isLost =>
+      isExpired &&
+      (isNotPostposed ||
+          (isPostposed && event.postposition.event.status.isExpired));
+  bool get isNotLost => !isLost;
+
   StatusManager(this.event);
 }
 
@@ -390,8 +397,8 @@ abstract class Event implements Comparable {
 
 class EventFather implements Event {
   // Private
-  String _name = "New";
-  String _description = "";
+  String _name = 'New';
+  String _description = '';
   late Tag _tag;
   late Icon _icon;
   late int _color;
@@ -466,7 +473,7 @@ class EventFather implements Event {
   int get color => _color;
   @override
   set color(int value) {
-    _color = value;
+    _color = limitBetween(0, value, 360);
     notifyChanges();
   }
 
@@ -474,7 +481,7 @@ class EventFather implements Event {
   int get priority => _priority;
   @override
   set priority(int value) {
-    _priority = value;
+    _priority = limitBetween(0, value, 10);
     notifyChanges();
   }
 
@@ -518,7 +525,7 @@ class EventFather implements Event {
   Lapse get length => status.isLazy ? Lapse(days: 1) : _length;
   @override
   set length(Lapse value) {
-    _length = value;
+    _length = value.limited(min: Lapse(minutes: 1));
     notifyChanges();
   }
 

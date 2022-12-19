@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:calendario/classes/funs.dart';
 
 import 'events.dart';
@@ -18,25 +16,28 @@ class Task {
 
 class TaskList {
   final List<Task> _tasks = [];
-  final Event father;
+  final Event event;
 
-  TaskList(this.father);
+  TaskList(this.event);
 
   bool Function(Task it) _byId(String id) => (it) => it.id == id;
 
-  void _refreshPositions(String idKeep) {
-    Task t = _tasks.firstWhere(_byId(idKeep));
-    int keep = _tasks.indexWhere(_byId(idKeep));
-    for (Task it in _tasks) {
-      if (it.position >= keep) {
-        it.position++;
+  void _refreshPositions({String? id}) {
+    if (id != null) {
+      Task t = _tasks.firstWhere(_byId(id));
+      int keep = _tasks.indexWhere(_byId(id));
+      for (Task it in _tasks) {
+        if (it.position >= keep) {
+          it.position++;
+        }
       }
+      t.position = keep;
     }
-    t.position = keep;
     _tasks.sort((a, b) => a.position.compareTo(b.position));
     for (int i = 0; i < _tasks.length; i++) {
       _tasks[i].position = i;
     }
+    event.notifyChanges();
   }
 
   void incorporate(Task task) {
@@ -50,7 +51,7 @@ class TaskList {
         ..position = task.position;
       task = aux.first;
     }
-    _refreshPositions(task.id);
+    _refreshPositions(id: task.id);
   }
 
   void incorporateAll(List<Task> tasks) {
@@ -61,43 +62,40 @@ class TaskList {
 
   void removeAt(int position) {
     _tasks.removeAt(position);
-    for (var i = 0; i < _tasks.length; i++) {
-      _tasks[i].position = i;
-    }
+    _refreshPositions();
   }
 
-  void removeId(String id) => removeAt(_tasks.firstWhere(_byId(id)).position);
+  void removeId(String id) {
+    _tasks.removeWhere((it) => it.id == id);
+    _refreshPositions();
+  }
 
-  void updateId(String id,
+  void updateById(String id,
       {int? position, String? description, bool? isComplete}) {
     Task task = _tasks.firstWhere(_byId(id));
     if (position != null) {
-      for (Task it in _tasks) {
-        if (it.position >= position) {
-          it.position++;
-        }
-      }
       task.position = position;
-      _tasks.sort((a, b) => a.position.compareTo(b.position));
-      for (int i = 0; i < _tasks.length; i++) {
-        _tasks[i].position = i;
-      }
+      _refreshPositions(id: task.id);
+      event.notifyChanges();
     }
     if (description != null) {
       task.description = description;
+      event.notifyChanges();
     }
     if (isComplete != null) {
       task.isComplete = isComplete;
+      event.notifyChanges();
     }
   }
 
   void updateAt(int position, {String? description, bool? isComplete}) {
-    updateId(_tasks[position].id,
+    updateById(_tasks[position].id,
         description: description, isComplete: isComplete);
   }
 
   void clear() {
     _tasks.clear();
+    event.notifyChanges();
   }
 
   Task operator [](int index) {
@@ -115,10 +113,10 @@ class TaskList {
         description: value.description, isComplete: value.isComplete);
   }
 
-  int size() => _tasks.length;
+  int get size => _tasks.length;
 
   void addTask(Task task) {
-    task.position = size();
+    task.position = size;
     incorporate(task);
   }
 
@@ -126,10 +124,10 @@ class TaskList {
       addTask(Task.newTask(0, description, false));
 
   List<Task> toList() {
-    List<Task> listtask = [];
+    List<Task> list = [];
     for (int i = 0; i < _tasks.length; i++) {
-      listtask.add(this[i]);
+      list.add(this[i]);
     }
-    return listtask;
+    return list;
   }
 }

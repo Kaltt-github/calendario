@@ -1,13 +1,13 @@
 import 'dart:math';
 import 'funs.dart';
 
-class _ColorFormat {
-  external HEX toHEX();
-  external RGB toRGB();
-  external CMYK toCMYK();
-  external HSV toHSV();
-  external HSL toHSL();
-  external int toINT();
+abstract class _ColorFormat {
+  HEX toHEX();
+  RGB toRGB();
+  CMYK toCMYK();
+  HSV toHSV();
+  HSL toHSL();
+  int toINT();
 }
 
 class HEX implements _ColorFormat {
@@ -333,7 +333,7 @@ class HSL implements _ColorFormat {
 }
 
 class Color {
-  _ColorFormat _format = _ColorFormat();
+  _ColorFormat _format = RGB();
   bool _isV = false;
 
   Color() {

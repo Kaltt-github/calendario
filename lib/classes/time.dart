@@ -60,6 +60,52 @@ class Delay {
         return Lapse();
     }
   }
+
+  Delay limited({Lapse? min, Lapse? max}) {
+    bool working = false;
+    if (type == DelayType.not) {
+      return this;
+    }
+    if (min != null && toLapse() < min) {
+      amount++;
+      working = true;
+    }
+    if (max != null && toLapse() > max) {
+      amount--;
+      if (amount == 0) {
+        switch (type) {
+          case DelayType.year:
+            type = DelayType.month;
+            amount = 365;
+            break;
+          case DelayType.month:
+            type = DelayType.week;
+            amount = 4;
+            break;
+          case DelayType.week:
+            type = DelayType.day;
+            amount = 7;
+            break;
+          case DelayType.day:
+            type = DelayType.hour;
+            amount = 24;
+            break;
+          case DelayType.hour:
+            type = DelayType.minute;
+            amount = 60;
+            break;
+          case DelayType.minute:
+            type = DelayType.not;
+            amount = 0;
+            break;
+          case DelayType.not:
+            break;
+        }
+      }
+      working = true;
+    }
+    return working ? limited(min: min, max: max) : this;
+  }
 }
 
 class Lapse {
@@ -110,70 +156,67 @@ class Lapse {
   bool get isEmpty => _mins() == 0;
   bool get isNotEmpty => !isEmpty;
 
-  bool isMoreThan(Lapse x) => _mins() > x._mins();
-  bool operator >(Lapse x) => isMoreThan(x);
+  bool operator >(Lapse x) => _mins() > x._mins();
 
-  bool isLessThan(Lapse x) => _mins() < x._mins();
-  bool operator <(Lapse x) => isLessThan(x);
+  bool operator <(Lapse x) => _mins() < x._mins();
 
-  bool isEqual(Lapse x) => _mins() == x._mins();
   @override
-  bool operator ==(Object other) => other is Lapse && isEqual(other);
+  bool operator ==(Object other) => other is Lapse && _mins() == other._mins();
 
-  bool isDifferent(Lapse x) => !isEqual(x);
+  bool isDifferent(Lapse x) => !(this == x);
 
-  bool isMoreOrEqual(Lapse x) => _mins() >= x._mins();
-  bool operator >=(Lapse x) => isMoreOrEqual(x);
+  bool operator >=(Lapse x) => _mins() >= x._mins();
 
-  bool isLessOrEqual(Lapse x) => _mins() <= x._mins();
-  bool operator <=(Lapse x) => isLessOrEqual(x);
+  bool operator <=(Lapse x) => _mins() <= x._mins();
 
   bool isPositive() => _mins() > 0;
 
   bool isNegative() => _mins() < 0;
   // Math
-  Lapse take(Lapse x) => Lapse(
+  Lapse operator -(Lapse x) => Lapse(
         years: years - x.years,
         months: months - x.months,
         days: days - x.days,
         hours: hours - x.hours,
         minutes: minutes - x.minutes,
       );
-  Lapse operator -(Lapse x) => take(x);
 
-  Lapse add(Lapse x) => Lapse(
+  Lapse operator +(Lapse x) => Lapse(
         years: years + x.years,
         months: months + x.months,
         days: days + x.days,
         hours: hours + x.hours,
         minutes: minutes + x.minutes,
       );
-  Lapse operator +(Lapse x) => add(x);
 
-  Lapse multiply(int i) => Lapse(
-        years: years * i,
-        months: months * i,
-        days: days * i,
-        hours: hours * i,
-        minutes: minutes * i,
+  Lapse operator *(int x) => Lapse(
+        years: years * x,
+        months: months * x,
+        days: days * x,
+        hours: hours * x,
+        minutes: minutes * x,
       );
-  Lapse operator *(int x) => multiply(x);
 
-  Lapse divide(int i) => Lapse(
-        years: years ~/ i,
-        months: months ~/ i,
-        days: days ~/ i,
-        hours: hours ~/ i,
-        minutes: minutes ~/ i,
+  Lapse operator /(int x) => Lapse(
+        years: years ~/ x,
+        months: months ~/ x,
+        days: days ~/ x,
+        hours: hours ~/ x,
+        minutes: minutes ~/ x,
       );
-  Lapse operator /(int x) => divide(x);
 
-  Lapse invert() => multiply(-1);
+  Lapse invert() => this * -1;
 
   Lapse toPositive() => isPositive() ? clone() : invert();
 
   Lapse toNegative() => isNegative() ? clone() : invert();
-  //
+  // others
+  Lapse limited({Lapse? min, Lapse? max}) => (min ?? this) > this
+      ? min!
+      : this > (max ?? this)
+          ? max!
+          : this;
+
   Lapse clone() => Lapse(
       years: years, months: months, days: days, hours: hours, minutes: minutes);
 

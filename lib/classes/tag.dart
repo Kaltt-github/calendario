@@ -69,11 +69,11 @@ class Tag {
   }
 
   static Tag appTag() => Tag(
-      "0",
+      '0',
       DateTime.now(),
       FromType.app,
-      "Calendario",
-      "Default",
+      'Calendario',
+      'Default',
       Icon.calendar,
       30,
       5,
@@ -97,6 +97,7 @@ class Tag {
     e.start = start;
     e.length = length;
     e.isFullDay = fullDay;
+    return;
     e.tasks.clear();
     e.tasks.incorporateAll(tasks);
     for (Lapse a in anticipations) {
