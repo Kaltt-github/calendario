@@ -109,7 +109,7 @@ class Event implements Comparable {
   @override
   int get hashCode => throw UnimplementedError();
   @override
-  int compareTo(other) => throw UnimplementedError();
+  int compareTo(other) => other is Event ? (other.start.compareTo(start)) : 1;
   // Status IMPLEMENTED
   bool get isFather => type == EventType.father;
   bool get isNotFather => !isNotFather;
@@ -891,9 +891,6 @@ class EventAnticipation extends EventChild {
       : super(father, EventType.anticipation, lapse);
 
   @override
-  List<Event> selfAndChildren() => [this];
-
-  @override
   String toString() {
     String s = '  ' * _deepth();
     return '''EventAnticipation {
@@ -1055,7 +1052,7 @@ class EventRepeat extends EventChild {
   set length(Lapse value) => father.length = value;
 
   EventRepeat(Event father, Lapse lapse)
-      : super(father, EventType.reminder, lapse) {
+      : super(father, EventType.repeat, lapse) {
     tasks.incorporateAll(father.tasks.toList());
     _anticipations = father.anticipations
         .map((it) => EventAnticipation(this, it.lapse))
@@ -1077,6 +1074,16 @@ class EventRepeat extends EventChild {
       }
     }
     return result;
+  }
+
+  @override
+  bool postpose(Lapse lapse) {
+    var result = lapse + postposed;
+    if (result >= postpositionLimit) {
+      return false;
+    }
+    postposed = result;
+    return true;
   }
 
   @override
@@ -1168,7 +1175,15 @@ class EventPostposition extends EventChild {
   }
 
   @override
-  List<Event> selfAndChildren() => [this];
+  List<Event> selfAndChildren() {
+    List<Event> result = [this];
+    if (isNotLazy) {
+      for (EventChild e in [...anticipations, ...reminders]) {
+        result.addAll(e.selfAndChildren());
+      }
+    }
+    return result;
+  }
 
   @override
   DateTime get end => lapse.applyOn(father.end);

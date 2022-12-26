@@ -102,17 +102,14 @@ class Tag {
     e.tasks
       ..clear()
       ..incorporateAll(tasks);
-    /*
     for (Lapse a in anticipations) {
-      e.anticipation.addByLapse(a);
+      e.addAnticipationByLapse(a);
     }
-    e.postposition.limit = postpositionLimit;
-    e.reminder.delay = reminderDelay;
-    e.repeat.delay = repeatDelay;
-    e.repeat.limit = repeatLimit;
-    e.status.isLazy = lazy;
-
-    */
+    e.postpositionLimit = postpositionLimit;
+    e.reminderDelay = reminderDelay;
+    e.repeatDelay = repeatDelay;
+    e.repeatLimit = repeatLimit;
+    e.isLazy = lazy;
   }
 
   Tag clone() => Tag(
