@@ -93,13 +93,16 @@ class Tag {
     e.icon = icon;
     e.color = color;
     e.priority = priority;
-    e.shared = shared;
+    e.shared
+      ..clear()
+      ..addAll(shared);
     e.start = start;
     e.length = length;
     e.isFullDay = fullDay;
-    return;
-    e.tasks.clear();
-    e.tasks.incorporateAll(tasks);
+    e.tasks
+      ..clear()
+      ..incorporateAll(tasks);
+    /*
     for (Lapse a in anticipations) {
       e.anticipation.addByLapse(a);
     }
@@ -108,6 +111,8 @@ class Tag {
     e.repeat.delay = repeatDelay;
     e.repeat.limit = repeatLimit;
     e.status.isLazy = lazy;
+
+    */
   }
 
   Tag clone() => Tag(

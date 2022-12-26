@@ -222,4 +222,8 @@ class Lapse {
 
   @override
   int get hashCode => _mins.hashCode;
+
+  @override
+  String toString() =>
+      'Lapse { Y: $years, M: $months, D:$days, h: $hours, m: $minutes}';
 }

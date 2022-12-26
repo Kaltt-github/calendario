@@ -1,4 +1,3 @@
-import 'package:calendario/classes/events.dart';
 import 'package:uuid/uuid.dart';
 
 int limitBetween(int min, int x, int max) => (x < min)
@@ -15,6 +14,3 @@ double module(double x) => (x > 0) ? x : x * -1;
 bool equal(int x, int y, int delta) => isBetween(x - delta, y, x + delta);
 
 String buildId() => const Uuid().v4();
-
-Event getFather(Event event) =>
-    event.status.isFather ? event : getFather(event.father);
